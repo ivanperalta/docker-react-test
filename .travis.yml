@@ -1,0 +1,38 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -t swimmit/complex-test -f ./client/Dockerfile.dev ./client
+
+scripts:
+  - docker run swimmit/complex-test npm test -- --coverage
+
+after_success:
+  - docker build -t swimmit/complex-client ./client
+  - docker build -t swimmit/complex-nginx ./nginx
+  - docker build -t swimmit/complex-server ./server
+  - docker build -t swimmit/complex-worker ./worker
+  # Login in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push to docker hub
+  - docker push swimmit/complex-client
+  - docker push swimmit/complex-nginx
+  - docker push swimmit/complex-server
+  - docker push swimmit/complex-worker
+
+  deploy:
+    provider: elasticbeanstalk
+    region: us-west-1
+    app: complex
+    env: complex-env
+    #S3 bucket defined for support the deploy
+    bucket_name: elasticbeanstalk-us-west-1-xxx
+    bucket_path: docker-multi
+    #Defining the hook responsible of trigger the event
+    on:
+      branch: master
+    #BASED ON THE ENV VARIABLED DEFINED IN TRAVIS
+    access_key_id: $AWS_ACCESS_KEY
+    secret_access_key: $AWS_SECRET_KEY
+
